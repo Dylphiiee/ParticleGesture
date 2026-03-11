@@ -210,22 +210,25 @@ function _sampleCanvas(oc, step=4) {
   return pts;
 }
 
-// Shared text-render helper: draws lines onto canvas oc, auto-fits font
+// Shared text-render helper — canvas = screen size, padY berlaku top DAN bottom.
+// Teks dijamin tidak terpotong di atas maupun bawah.
 function _renderTextLines(oc, lines, padX, padY, initFS) {
-  const ox = oc.getContext('2d');
+  const ox     = oc.getContext('2d');
   const availW = oc.width  - padX * 2;
   const availH = oc.height - padY * 2;
   let fs = initFS;
-  for (let t = 0; t < 50; t++) {
+  for (let t = 0; t < 60; t++) {
     ox.font = '800 ' + Math.ceil(fs) + 'px Syne, sans-serif';
     const maxW   = Math.max(...lines.map(l => ox.measureText(l).width));
-    const totalH = lines.length * fs * 1.22;
+    const totalH = lines.length * fs * 1.28;   // line-height lebih longgar
     if (maxW <= availW && totalH <= availH) break;
-    fs *= 0.88;
+    fs *= 0.85;
   }
-  const lineH  = fs * 1.22;
+  const lineH  = fs * 1.28;
   const totalH = lines.length * lineH;
-  const startY = (oc.height - totalH) / 2 + lineH * 0.5;
+  // Center di dalam zona aman [padY .. height-padY]
+  const safeCenter = padY + availH / 2;
+  const startY     = safeCenter - totalH / 2 + lineH / 2;
   ox.fillStyle    = '#fff';
   ox.font         = '800 ' + Math.ceil(fs) + 'px Syne, sans-serif';
   ox.textAlign    = 'center';
@@ -259,10 +262,10 @@ function sampleIndex() {
   const oc = document.createElement('canvas');
   oc.width  = W();
   oc.height = H();
-  // Padding lebih besar vertikal — dua baris butuh ruang
+  // padY 18% top+bottom — dua baris aman tidak terpotong
   const padX = W() * 0.05;
-  const padY = H() * 0.15;
-  _renderTextLines(oc, ['Namaku', 'Dylphiiee'], padX, padY, Math.min(W(), H()) * 0.26);
+  const padY = H() * 0.18;
+  _renderTextLines(oc, ['Namaku', 'Dylphiiee'], padX, padY, Math.min(W(), H()) * 0.25);
   return _sampleCanvas(oc, 4);
 }
 
@@ -276,26 +279,25 @@ function sampleFist() {
   const oc = document.createElement('canvas');
   oc.width  = W();
   oc.height = H();
-  // Tiga baris — padding vertikal besar, font dimulai lebih kecil
+  // Tiga baris — padY 16% top+bottom, font mulai 18% SHORT agar muat
   const padX = W() * 0.05;
-  const padY = H() * 0.10;
-  _renderTextLines(oc, ['Seorang', 'Software', 'Engineering'], padX, padY, Math.min(W(), H()) * 0.20);
+  const padY = H() * 0.16;
+  _renderTextLines(oc, ['Seorang', 'Software', 'Engineering'], padX, padY, Math.min(W(), H()) * 0.18);
   return _sampleCanvas(oc, 4);
 }
 
 // ════════════════════════════════════
-// DEDICATED SAMPLER — mode "side"
+// DEDICATED SAMPLER — mode "side" (gesture: thumbs up 👍)
 // "Terima / Kasih!" — dua baris,
-// canvas W×H, feel lebih lebar/festive
-// font dimulai besar, padding ramping
+// canvas W×H, padding aman top+bottom
 // ════════════════════════════════════
 function sampleSide() {
   const oc = document.createElement('canvas');
   oc.width  = W();
   oc.height = H();
-  const padX = W() * 0.04;
-  const padY = H() * 0.12;
-  _renderTextLines(oc, ['Terima', 'Kasih!'], padX, padY, Math.min(W(), H()) * 0.30);
+  const padX = W() * 0.05;
+  const padY = H() * 0.18;
+  _renderTextLines(oc, ['Terima', 'Kasih!'], padX, padY, Math.min(W(), H()) * 0.28);
   return _sampleCanvas(oc, 4);
 }
 
@@ -788,11 +790,12 @@ function detect(mhl) {
   const ext = [iU,mU,rU,pU].filter(Boolean).length;
 
   if (iD && mD && rD && pD) return 'fist';
-  if (ext >= 4) {
-    const ks = Math.abs(lm[5].x - lm[17].x);
-    if (ks < 0.08) return 'side';
-    return 'open';
-  }
+
+  // THUMBS UP — jempol naik, semua jari lain turun
+  const thumbUp = thumbTip.y < lm[2].y - 0.04;   // tip jempol jelas lebih tinggi dari MCP
+  if (thumbUp && iD && mD && rD && pD) return 'side';
+
+  if (ext >= 4) return 'open';
   if (iU && !mU && !rU && !pU && !thumbExt) return 'index';
   if (iU && mU && !rU && !pU) {
     const spread = Math.abs(iTip.x - mTip.x);
